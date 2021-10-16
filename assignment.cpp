@@ -33,14 +33,16 @@ using namespace std;
 
 //****************************************** for printing and scrolling
 		int KEY_ESCAPE=27;
-		int start = 0;
-		int endd = 4;
-		int curpos = 1;
+		int start ;
+		int endd ;
+		int curpos ;
 		int limit ;
+		int cursor;
+		int window;
 
 
-// /=======================================================================================================================
-                                                            // IMP functions
+//=========================================================================================================================
+//                                                       IMP functions
 //=========================================================================================================================
 
 //-------------clearing screen------
@@ -173,7 +175,7 @@ void print_N_files(vector<string> files){//, int start,int esdd){
 	// vector<string> files = getfilesdetails();
 		int endd_=limit;
 		int start_ = 0;
-		if(limit>endd){
+		if(limit>=endd){
 			start_=start;
 			endd_=endd;
 		}
@@ -249,18 +251,24 @@ void print_N_files(vector<string> files){//, int start,int esdd){
 //=============================================================================================================================
 void upkey(){
 
-	if(curpos!=1){
+	if(cursor>1){
+		cursor--;
 		curpos--;
-		gotoxy(0,curpos);
+		gotoxy(0,14);
+		cout<<"curpos: "<<curpos<<", limit: "<<limit<<", start: "<<start<<", endd: "<<endd<<"\r\n";
+		gotoxy(0,cursor);
 	}
 }
 //************************************************************* navigation keys *******************************************
 void downkey(){
 
-	if(curpos!=endd and curpos!=limit){
-		cout<<curpos<<"\r\n";
+	if(cursor<window and curpos<limit){
+		// cout<<curpos<<"\r\n";
 		curpos++;
-		gotoxy(0,curpos);
+		cursor++;
+		gotoxy(0,14);
+		cout<<"curpos: "<<curpos<<", limit: "<<limit<<", start: "<<start<<", endd: "<<endd<<"\r\n";
+		gotoxy(0,cursor);
 	}
 }
 
@@ -278,25 +286,46 @@ void leftkey(){
 }
 
 void k(){
-
-}
-void l(){
-
-	if(curpos==endd and endd!=limit){
+	if(cursor==1 and curpos>0){
 		char cwd[PATH_MAX];
 	   	getcwd(cwd, sizeof(cwd));
 	   	string currwd = cwd;
 	   	clearscreen();
+	   	curpos--;
+		start--;
+		endd--;
+		vector<string> files = getfilesdetails(currwd);
+		print_N_files(files);
+		gotoxy(0,14);
+		cout<<"curpos: "<<curpos<<", limit: "<<limit<<", start: "<<start<<", endd: "<<endd<<"\r\n";
+		gotoxy(0,cursor);
+
+	}
+}
+void l(){// navigates down on l if not the end of files and cursor at the last point
+
+	if(cursor==window and curpos<limit-1){
+		char cwd[PATH_MAX];
+	   	getcwd(cwd, sizeof(cwd));
+	   	string currwd = cwd;
+	   	clearscreen();
+	   	curpos++;
 		start++;
 		endd++;
 		vector<string> files = getfilesdetails(currwd);
 		print_N_files(files);
-		curpos++;
-		gotoxy(0,curpos);
+		gotoxy(0,14);
+		cout<<"curpos: "<<curpos<<", limit: "<<limit<<", start: "<<start<<", endd: "<<endd<<"\r\n";
+		gotoxy(0,cursor);
+
 	}
 
 }
 void enter(){
+
+	gotoxy(0,15);
+	cout<<"enter dbaya gya hai at curpos: "<<curpos;
+	gotoxy(0,cursor);
 
 }
 void backspace(){
@@ -307,7 +336,9 @@ void h(){
 }
 
 
-//**************************************************************</navigation keys>*****************************************
+//=============================================================================================================================
+//                                                      DETECT KEYS
+//=============================================================================================================================
 
 
 
@@ -424,13 +455,18 @@ void enable_scrolling(){  //dont press esccape.
 //=============================================================================================================================
 
 
-//------------------------------------------------------------- entering normal mode (non canonical mode)-----------------------
+//------------------------------------------------------------- entering normal mode (non canonical mode)------------------------------
 
 void normal_mode(string cwd){
 	resizewin();
 	enableRawMode();
 	vector<string> files = getfilesdetails(cwd);
 	limit=files.size();
+	start = 0;
+	endd = 4;
+	window = 4;
+	curpos = 0;
+	cursor = 1;
 
 	print_N_files(files);
 
