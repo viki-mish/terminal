@@ -165,6 +165,8 @@ string perms_(mode_t  perms){
 }
 
 
+
+
 //--------------getting file details and printing ----------------------
 void print_N_files(vector<string> files){//, int start,int esdd){
 
@@ -242,6 +244,16 @@ void print_N_files(vector<string> files){//, int start,int esdd){
 
 }
 
+bool checkifdir(string file_name){
+	if (stat(file_name.c_str(), &statbuf) == -1)
+        ;
+    string per=perms_(statbuf.st_mode);
+
+    if(per[0]=='d'){
+    	return true;
+    }
+    return false;
+}
 
 
 
@@ -324,7 +336,19 @@ void l(){// navigates down on l if not the end of files and cursor at the last p
 void enter(){
 
 	gotoxy(0,15);
-	cout<<"enter dbaya gya hai at curpos: "<<curpos;
+	char cwd[PATH_MAX];
+	getcwd(cwd, sizeof(cwd));
+   	string currwd = cwd;
+	vector<string> files = getfilesdetails(currwd);
+	if(checkifdir(files[curpos])){
+		
+		cout<<"enter dbaya gya hai at curpos: "<<curpos<<" aur ye directory hai";
+		
+	}
+	else{
+		cout<<"enter dbaya gya hai at curpos: "<<curpos<<" aur ye file hai";
+		
+	}
 	gotoxy(0,cursor);
 
 }
