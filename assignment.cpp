@@ -10,13 +10,16 @@
 #include <unistd.h>
 #include <grp.h>
 #include <time.h>
+// #include<experimental/filesystem>
 
 #include <locale.h>
 #include <langinfo.h>
+#include <fstream>
 #include <stdint.h>
 
 #include <termios.h>//RAWMODE
 using namespace std;
+// namespace fs = std::experimental::f/ilesystem;
 
 #define gotoxy(x,y) printf("\033[%d;%dH", (y), (x))
 
@@ -466,14 +469,23 @@ string change(string s){
 	int len = s.size();
 	string fin = "";
 	if(s[0]=='~'){
-		fin= home+s.substr(1,len-1);
+		if(len==1){
+			fin=home;
+		}
+		else
+			fin= home+s.substr(1,len-1);
 	}
 	if(s[0]=='.'){
 		char cwd[PATH_MAX];
 		getcwd(cwd, sizeof(cwd));
 	   	string currwd = cwd;
 
-		fin = cwd + s.substr(1,len-1);
+	   	if(len==1){
+	   		fin=cwd;
+	   	}
+	   	else
+			fin = cwd + s.substr(1,len-1);
+
 	}
 	return fin;
 }
@@ -485,11 +497,11 @@ vector<string> getcmd(string s){
 	while(getline(ss,str,' ')){
 		output.push_back(str);
 	}
+	int len = output.size();
 
 	if(output[0]=="search"){
 		return output;
 	}
-	int len = output.size();
 	else{
 		string a = output[len-1];
 		a=change(a);
@@ -498,31 +510,108 @@ vector<string> getcmd(string s){
 	return output;
 }
 
+void create_file(vector<string> v){
+
+	const char *source;
+	const char *path;
+
+   	string src = v[2] + "/" + v[1];
+   	path = src.c_str();
+
+	std::ofstream file(path); //open in constructor
+    std::string data("");
+    file << data;
+
+    source=src.c_str();
+
+    chmod(source,S_IRUSR|S_IWUSR);
+
+    gotoxy(0,13);
+	cout<<" "<<" creating "<<v[1]<<" "<<v[2];
+
+	gotoxy(0,16);
+
+
+}
+
+int delete_dir(const char *path) {
+   DIR *d = opendir(path);
+   size_t path_len = strlen(path);
+   int r = -1;
+
+   if (d) {
+      struct dirent *p;
+
+      r = 0;
+      while (!r && (p=readdir(d))) {
+          int r2 = -1;
+          char *buf;
+          size_t len;
+
+          /* Skip the names "." and ".." as we don't want to recurse on them. */
+          if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, ".."))
+             continue;
+
+          len = path_len + strlen(p->d_name) + 2; 
+          buf = malloc(len);
+
+          if (buf) {
+             struct stat statbuf;
+
+             snprintf(buf, len, "%s/%s", path, p->d_name);
+             if (!stat(buf, &statbuf)) {
+                if (S_ISDIR(statbuf.st_mode))
+                   r2 = delete_dir(buf);
+                else
+                   r2 = unlink(buf);
+             }
+             free(buf);
+          }
+          r = r2;
+      }
+      closedir(d);
+   }
+
+   if (!r)
+      r = rmdir(path);
+
+   return r;
+}
+
+
+
 void copy(vector<string> v){
 
 	int len = v.size();
 	string DEST = v[len-1];
+	DEST = DEST;
 
 	char cwd[PATH_MAX];
 	getcwd(cwd, sizeof(cwd));
    	string currwd = cwd;
 
-	for(int i = 0;i<len-1){
+   	gotoxy(0,13);
+   	
 
-		string SRC = currwd + "/" + output[i];
+	for(int i = 1;i<len-1;i++){
+
+		string SRC = currwd + "/" + v[i];
+
 
 		struct stat st;
-
-		stat(SRC, &st);
-		string k = DEST+"/"+output[i];
+		stat(SRC.c_str(), &st);
+		string k = DEST+"/"+v[i];
 
 		std::ifstream src(SRC.c_str(), std::ios::binary);
 	    std::ofstream dest(DEST.c_str(), std::ios::binary);
-
-	    
 	    dest << src.rdbuf();
 		
-		chmod(k, st.st_mode);
+		
+		chmod(k.c_str(), st.st_mode);
+
+		cout<<len<<" "<<" copying "<<SRC<<" "<<DEST;
+
+	   	gotoxy(0,16);
 	}
 
 
@@ -535,7 +624,7 @@ int check(string s){
 		return 2;
 	else if(s=="rename")
 		return 3;
-	else if(s=="ceate_file")
+	else if(s=="create_file")
 		return 4;
 	else if(s=="create_dir")
 		return 5;
@@ -577,7 +666,7 @@ void cmd(){
 			return;
 		}
 		if((int)c==13){//enter
-			cout<<" enter is pressed";
+			// cout<<" enter is pressed";
 			vector<string> commands = getcmd(s);
 			s="";
 			int command = check(commands[0]);
@@ -591,12 +680,14 @@ void cmd(){
 				case 3:
 					break;
 				case 4:
+					create_file(commands);
 					break;
 				case 5:
 					break;
 				case 6:
 					break;
 				case 7:
+					delete_dir(commands[1].c_str())
 					break;
 				case 8:
 					break;
