@@ -39,6 +39,13 @@ using namespace std;
 		int limit ;
 		int cursor;
 		int window;
+		int flag = 0;
+		int notenabled=1;
+		int hset=0;
+
+		stack<string> stkleft;
+		stack<string> stkright;
+
 
 
 //=========================================================================================================================
@@ -61,6 +68,8 @@ void sethome(){
 void resizewin(){
 	cout << "\e[8;30;120t";
 }
+void normal_mode(string);
+static int kbget(void);
 
 
 //==========================================================================================================================
@@ -136,8 +145,9 @@ vector<string> getfilesdetails(string dir){ //taking file names in a vector
 
 }
 
-
-//-----------------------reading perms of files and dirs----------------------
+//---------------------------------------------------------------------------------------------------------------------
+//                                               reading perms of files and dirs
+//---------------------------------------------------------------------------------------------------------------------
 string perms_(mode_t  perms){
 
 		string perm="";
@@ -166,8 +176,10 @@ string perms_(mode_t  perms){
 
 
 
+//----------------------------------------------------------------------------------------------------------------------------
+//                                                    getting file details and printing 
+// ---------------------------------------------------------------------------------------------------------------------------
 
-//--------------getting file details and printing ----------------------
 void print_N_files(vector<string> files){//, int start,int esdd){
 
 	// int n = files.size();
@@ -219,6 +231,13 @@ void print_N_files(vector<string> files){//, int start,int esdd){
 
 	            // cout<<"--------------";
 
+	            if(!hset){
+	            	string a = pwd->pw_name;
+	            	home = "/home/"+a;
+	            	hset=1;
+	            }
+
+
 
 
 	            /* Print out group name if it is found using getgrgid(). */
@@ -259,7 +278,7 @@ bool checkifdir(string file_name){
 
 
 //=============================================================================================================================
-//                                                     SCROLLING IN NORMAL MODE
+//                                      SCROLLING IN NORMAL MODE (up and down keys)
 //=============================================================================================================================
 void upkey(){
 
@@ -274,7 +293,7 @@ void upkey(){
 //************************************************************* navigation keys *******************************************
 void downkey(){
 
-	if(cursor<window and curpos<limit){
+	if(cursor<window and curpos<limit and cursor<limit){
 		// cout<<curpos<<"\r\n";
 		curpos++;
 		cursor++;
@@ -282,19 +301,6 @@ void downkey(){
 		cout<<"curpos: "<<curpos<<", limit: "<<limit<<", start: "<<start<<", endd: "<<endd<<"\r\n";
 		gotoxy(0,cursor);
 	}
-}
-
-void rightkey(){
-
-	// if(curpos!=endd and curpos!=limit)gotoxy(0,curpos++);
-	cout<<"hi";
-
-}
-
-void leftkey(){
-
-	// if(curpos!=endd and curpos!=limit)gotoxy(0,curpos++);
-
 }
 
 void k(){
@@ -333,9 +339,56 @@ void l(){// navigates down on l if not the end of files and cursor at the last p
 	}
 
 }
+
+//=============================================================================================================================
+//                                  NAVIGATING IN NORMAL MODE (RIGHT, H, ENTER, BACKSPACE, H  keys)
+//=============================================================================================================================
+
+
+void rightkey(){
+
+	// if(curpos!=endd and curpos!=limit)gotoxy(0,curpos++);
+	if(!stkright.empty()){
+		string rightdir = stkright.top();
+		stkright.pop();
+
+		char cwd[PATH_MAX];
+		getcwd(cwd, sizeof(cwd));
+	   	string currwd = cwd;
+
+		stkleft.push(currwd);
+
+		chdir(rightdir.c_str());
+		normal_mode(rightdir);
+		flag = 1;
+
+	}
+
+}
+
+void leftkey(){
+
+	// if(curpos!=endd and curpos!=limit)gotoxy(0,curpos++);
+	if(!stkleft.empty()){
+		string leftdir = stkleft.top();
+		stkleft.pop();
+
+		char cwd[PATH_MAX];
+		getcwd(cwd, sizeof(cwd));
+	   	string currwd = cwd;
+
+		stkright.push(currwd);
+
+		chdir(leftdir.c_str());
+		normal_mode(leftdir);
+		flag=1;
+	}
+
+}
+
 void enter(){
 
-	gotoxy(0,15);
+	gotoxy(4,15);
 	char cwd[PATH_MAX];
 	getcwd(cwd, sizeof(cwd));
    	string currwd = cwd;
@@ -343,19 +396,226 @@ void enter(){
 	if(checkifdir(files[curpos])){
 		
 		cout<<"enter dbaya gya hai at curpos: "<<curpos<<" aur ye directory hai";
+
+		string cwdd = currwd+"/"+files[curpos];
+		stkleft.push(currwd);
+		chdir(cwdd.c_str());
+		normal_mode(cwdd);
+		flag=1;
+		return;
 		
 	}
 	else{
-		cout<<"enter dbaya gya hai at curpos: "<<curpos<<" aur ye file hai";
-		
+		cout<<"enter dbaya gya hai at curpos: "<<curpos<<" aur ye file hai "<<cwd;
+		pid_t pid = fork();
+		if (pid == 0) {
+		  execl("/usr/bin/xdg-open", "xdg-open", files[curpos].c_str(), (char *)0);
+		  exit(1);
+		}
 	}
+	gotoxy(0,16);
+	chdir(cwd);
 	gotoxy(0,cursor);
 
 }
-void backspace(){
+void backspace(){// moves one level up and clears left and right stack.
+
+
+	// if(!stkleft.empty()){
+	// 	leftkey();
+	// }
+	// else{
+		char cwd[PATH_MAX];
+		getcwd(cwd, sizeof(cwd));
+	   	string currwd = cwd;
+		
+		stkleft = stack<string>();
+		stkright = stack<string>();
+
+	   	string cwdd = currwd+"/..";
+		chdir(cwdd.c_str());
+		normal_mode(cwdd);
+		flag = 1;
+		return;
+	// }
 
 }
 void h(){
+
+	char cwd[PATH_MAX];
+	getcwd(cwd, sizeof(cwd));
+   	string currwd = cwd;
+	
+	stkleft = stack<string>();
+	stkright = stack<string>();
+
+   	string cwdd = home;
+	chdir(cwdd.c_str());
+	normal_mode(cwdd);
+	flag = 1;
+	return;
+
+}
+
+
+//=============================================================================================================================
+//                                                      COMMAND MODE
+//=============================================================================================================================
+
+string change(string s){
+	int len = s.size();
+	string fin = "";
+	if(s[0]=='~'){
+		fin= home+s.substr(1,len-1);
+	}
+	if(s[0]=='.'){
+		char cwd[PATH_MAX];
+		getcwd(cwd, sizeof(cwd));
+	   	string currwd = cwd;
+
+		fin = cwd + s.substr(1,len-1);
+	}
+	return fin;
+}
+
+vector<string> getcmd(string s){
+	stringstream ss(s);
+	vector<string> output;
+	string str;
+	while(getline(ss,str,' ')){
+		output.push_back(str);
+	}
+
+	if(output[0]=="search"){
+		return output;
+	}
+	int len = output.size();
+	else{
+		string a = output[len-1];
+		a=change(a);
+		output[len-1]=a;
+	}
+	return output;
+}
+
+void copy(vector<string> v){
+
+	int len = v.size();
+	string DEST = v[len-1];
+
+	char cwd[PATH_MAX];
+	getcwd(cwd, sizeof(cwd));
+   	string currwd = cwd;
+
+	for(int i = 0;i<len-1){
+
+		string SRC = currwd + "/" + output[i];
+
+		struct stat st;
+
+		stat(SRC, &st);
+		string k = DEST+"/"+output[i];
+
+		std::ifstream src(SRC.c_str(), std::ios::binary);
+	    std::ofstream dest(DEST.c_str(), std::ios::binary);
+
+	    
+	    dest << src.rdbuf();
+		
+		chmod(k, st.st_mode);
+	}
+
+
+}
+
+int check(string s){
+	if(s=="copy")
+		return 1;
+	else if(s=="move")
+		return 2;
+	else if(s=="rename")
+		return 3;
+	else if(s=="ceate_file")
+		return 4;
+	else if(s=="create_dir")
+		return 5;
+	else if(s=="delete_file")
+		return 6;
+	else if(s=="delete_dir")
+		return 7;
+	else if(s=="goto")
+		return 8;
+	else if(s=="search")
+		return 9;
+	else
+		return 0;
+}
+
+void cmd(){
+	gotoxy(0,15);
+	cout<<"COMMAND MODE"<<"\r\n";
+	// disableRawMode();
+
+	char c ;
+
+	int flag_ = 1;
+	string s = "";
+	while(flag_){
+		c = cin.get();
+
+		if((int)c==27){
+			char cwd[PATH_MAX];
+			getcwd(cwd, sizeof(cwd));
+		   	string currwd = cwd;
+		   	normal_mode(cwd);
+		   	flag=1;
+			flag_=0;
+			break;
+		}
+		if((int)c==113){
+			flag=1;
+			return;
+		}
+		if((int)c==13){//enter
+			cout<<" enter is pressed";
+			vector<string> commands = getcmd(s);
+			s="";
+			int command = check(commands[0]);
+			printf("\33[2K\r");
+			switch(command){
+				case 1:
+					copy(commands);
+					break;
+				case 2:
+					break;
+				case 3:
+					break;
+				case 4:
+					break;
+				case 5:
+					break;
+				case 6:
+					break;
+				case 7:
+					break;
+				case 8:
+					break;
+				case 9:
+					break;
+			}
+
+		}
+		else{
+			cout<<(char)c;
+			s=s+c;
+			// cout<<s;	
+		}
+
+
+
+	}
+
+
 
 }
 
@@ -419,6 +679,7 @@ static int kbesc(void)
     return c;
 }
 
+
 static int kbget(void)
 {
     int c;
@@ -446,6 +707,8 @@ static int kbget(void)
     			break;
     		case 127:
     			backspace();
+    		case 58:
+    			cmd();
     			break;
     	}
 
@@ -455,21 +718,25 @@ static int kbget(void)
 
 }
 
+//==================================== LOOKING AT KEYPRESS AND EXITING ON q =================================================
 
-
-
+// int cur = 13;
 
 void enable_scrolling(){  //dont press esccape.
 
 	int c ;
 	gotoxy(0,1);
 
-	while((c = kbget()) and c!=113){
+	while((c = kbget()) and c!=113 and !flag){
 
 	}
 
+	// gotoxy(0,cur);
+
+
 
 }
+
 
 
 
@@ -482,24 +749,37 @@ void enable_scrolling(){  //dont press esccape.
 //------------------------------------------------------------- entering normal mode (non canonical mode)------------------------------
 
 void normal_mode(string cwd){
+	clearscreen();
 	resizewin();
-	enableRawMode();
+	if(notenabled)
+		enableRawMode();
+	notenabled=0;
 	vector<string> files = getfilesdetails(cwd);
 	limit=files.size();
 	start = 0;
-	endd = 4;
-	window = 4;
+	endd = 10;
+	window = 10;
 	curpos = 0;
 	cursor = 1;
 
 	print_N_files(files);
 
 	enable_scrolling();
+	// cout<<"exiting normal mode "<<cur-12;
+	// cur++;
+	
+
 	clearscreen();
+	// exit(0);
 
 
 }
 
+
+
+//=============================================================================================================================
+//                                                           INIT PROGRAM
+//=============================================================================================================================
 
 
 
@@ -514,7 +794,8 @@ int main(int argc, char const *argv[])
    	string currwd = cwd;
    	normal_mode(currwd);
 
-
+   	// gotoxy(0,18);
+   	// cout<<"hi"<<endl;
 
 
 	return 0;
